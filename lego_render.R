@@ -1,15 +1,4 @@
-## Base-graphics ("2.5D" isometric) renderer for lego plots.
-##
-## This deliberately avoids rgl entirely: it projects each 3D bar onto a 2D
-## plane by hand and draws it with graphics::polygon(), so the whole plot is
-## just base R (grDevices + graphics, both always present). That means it
-## needs no OpenGL, no X11, no headless-Chrome workaround, and no
-## architecture-specific compiled package at all -- a plain png()/pdf()
-## device is sufficient anywhere R runs (a laptop, a bare Docker image, a
-## cluster node with no display), on x86_64 or arm64 alike.
-##
-## The trade-off vs. rgl: this produces a static image, not an interactive,
-## rotatable scene.
+## Static base-R renderer for lego plots.
 
 #' Darken/lighten a hex color by a brightness factor
 #'
@@ -27,89 +16,82 @@ shade_color <- function(hex, factor) {
 
 #' Project a 3D point onto the 2D isometric drawing plane
 #'
-#' Standard axonometric ("isometric tile") projection: \code{x} and \code{y}
-#' are the two horizontal grid axes (columns/rows of the lego grid), \code{z}
-#' is bar height. The camera looks down at the grid from above one corner, so
-#' the cell with the largest \code{x + y} is nearest the viewer (bottom of
-#' the image) and \code{(0, 0)} is farthest (top of the image); increasing
-#' \code{z} moves a point straight up the image.
+#' Project grid coordinates using the requested camera angles.
 #'
 #' @param x,y,z Numeric vectors of grid/height coordinates.
+#' @param elevation Camera elevation in degrees.
+#' @param azimuth Camera rotation around the plot in degrees.
 #' @return A list with elements \code{sx}, \code{sy} (screen coordinates).
 #' @keywords internal
-iso_project <- function(x, y, z = 0) {
-  cos30 <- sqrt(3) / 2
-  sin30 <- 0.5
-  ## sx is negated (y - x, not x - y) purely to mirror left/right so screen
-  ## position matches the reference renders (sig9.png, lego_ref.png); sy is
-  ## untouched so front/back depth ordering (which was already correct) is
-  ## unaffected.
-  list(sx = (y - x) * cos30, sy = -(x + y) * sin30 + z)
+iso_project <- function(x, y, z = 0, elevation = 35.26439, azimuth = 45) {
+  # Convert camera angles to radians.
+  elevation <- elevation * pi / 180
+  azimuth <- azimuth * pi / 180
+
+  # Project while keeping z measured in grid units.
+  list(
+    sx = (y * cos(azimuth) - x * sin(azimuth)) / cos(elevation),
+    sy = -(x * cos(azimuth) + y * sin(azimuth)) * tan(elevation) + z
+  )
 }
 
 #' Draw one 3D bar as three shaded isometric faces
 #'
-#' Only the top face and the two side faces touching the bar's nearest
-#' vertical edge (max-x and max-y) are visible from the camera used by
-#' \code{\link{iso_project}}, so only those three quads are drawn.
+#' Draw the two visible sides and top of one bar.
 #'
 #' @param x0,x1,y0,y1 Footprint of the bar in grid units.
 #' @param z1 Bar height in grid units (base is always at \code{z = 0}).
 #' @param topcolor Base color of the bar; the two side faces are automatically
 #'   shaded darker/lighter versions of it.
+#' @param alpha Bar opacity between 0 (fully transparent) and 1 (opaque).
+#' @param elevation Camera elevation in degrees.
+#' @param azimuth Camera rotation around the plot in degrees.
 #' @param border Outline color for each face, or \code{NA} for none.
 #' @param shade_top,shade_front,shade_right Brightness multipliers (see \code{\link{shade_color}}).
 #' @keywords internal
-draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, border = "grey15",
+draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, alpha = 1,
+                          elevation = 35.26439, azimuth = 45,
+                          border = "grey15",
                           shade_top = 1, shade_front = 0.8, shade_right = 0.6) {
+  # Project and draw one face.
   quad <- function(x, y, z, col) {
-    p <- iso_project(x, y, z)
-    graphics::polygon(p$sx, p$sy, col = col, border = border, lwd = 0.6)
+    p <- iso_project(x, y, z, elevation = elevation, azimuth = azimuth)
+    graphics::polygon(p$sx, p$sy,
+                      col = grDevices::adjustcolor(col, alpha.f = alpha),
+                      border = border, lwd = 0.6)
   }
   if (z1 <= 0) return(invisible())
 
-  ## Right face (x = x1)
+  # Draw the right, front, and top faces.
   quad(c(x1, x1, x1, x1), c(y0, y1, y1, y0), c(0, 0, z1, z1),
        shade_color(topcolor, shade_right))
-  ## Front face (y = y1)
   quad(c(x0, x1, x1, x0), c(y1, y1, y1, y1), c(0, 0, z1, z1),
        shade_color(topcolor, shade_front))
-  ## Top face (z = z1)
   quad(c(x0, x1, x1, x0), c(y0, y0, y1, y1), c(z1, z1, z1, z1),
        shade_color(topcolor, shade_top))
   invisible()
 }
 
-#' Render a lego layout with base graphics (no rgl, no display required)
+#' Render a lego layout
 #'
-#' Draws the 3D bars described by a layout data frame (see
-#' \code{\link{compute_lego_layout}}) as a static isometric ("2.5D") image,
-#' using nothing but \pkg{graphics}/\pkg{grDevices}. Works identically in an
-#' interactive session, a plain \code{Rscript} call, or a headless
-#' container/CI job -- the only requirement is a graphics device, and
-#' \code{png()}/\code{pdf()} (used automatically when \code{outfile} is set)
-#' are always available in base R.
+#' Draw a static projected 3D plot using base graphics.
 #'
 #' @param layout A data frame as returned by \code{\link{compute_lego_layout}}.
 #' @param gap Fraction (0-1) of each grid cell left empty as a gap between bars.
-#' @param zscale Height, in grid units, that the tallest bar should reach.
-#'   Grid cells are 1 unit square, so the default of 3 gives bars a similar
-#'   footprint-to-height ratio to a real lego brick.
-#' @param zmax The data value that should map to \code{zscale}. Defaults to
-#'   \code{max(layout$value)}; set this explicitly (e.g. to the same number
-#'   across several calls) to keep the vertical scale comparable across
-#'   multiple plots -- important when comparing signatures side by side.
+#' @param zscale Height in grid units of the value at \code{zmax}.
+#' @param zmax Data value mapped to \code{zscale}; defaults to the maximum value.
 #' @param labels Draw "preceding base" / "succeeding base" axis labels.
 #' @param zlabels Draw a numeric scale on the vertical (z) axis.
 #' @param zsub Descriptive label for the vertical axis, or \code{FALSE} for none.
 #' @param gridlines Draw a floor grid under the bars.
 #' @param main Optional plot title.
-#' @param shade_top,shade_front,shade_right Brightness multipliers for the
-#'   three visible faces of each bar (see \code{\link{shade_color}}).
+#' @param legend Draw a boxed base-substitution color legend.
+#' @param alpha Bar opacity between 0 (fully transparent) and 1 (opaque).
+#' @param elevation Camera elevation in degrees, greater than 0 and less than 90.
+#' @param azimuth Camera rotation around the plot in degrees, from 10 to 80.
+#' @param shade_top,shade_front,shade_right Face brightness multipliers.
 #' @param border Outline color for bar faces.
-#' @param outfile If not \code{NA}, save the plot to this path instead of the
-#'   current graphics device. The format is taken from the file extension
-#'   (".png", ".pdf", ".svg", ...); PNG is used if there is none.
+#' @param outfile Output path, or \code{NA} for the current graphics device.
 #' @param width,height Output size in pixels (PNG) or inches (PDF/SVG).
 #' @param res Resolution in dpi, used for PNG output.
 #' @return The \code{layout} data frame, invisibly.
@@ -122,17 +104,38 @@ draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, border = "grey15",
 #' @export
 render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
                            labels = FALSE, zlabels = TRUE, zsub = FALSE,
-                           gridlines = TRUE, main = NULL,
+                           gridlines = TRUE, main = NULL, legend = FALSE, alpha = 1,
+                           elevation = 35.26439, azimuth = 45,
                            shade_top = 1, shade_front = 0.8, shade_right = 0.6,
                            border = "grey15",
                            outfile = NA, width = 1000, height = 800, res = 150) {
 
+  # Validate view and transparency options.
+  if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
+      alpha < 0 || alpha > 1) {
+    stop("alpha must be a single number between 0 and 1.", call. = FALSE)
+  }
+  if (!is.logical(legend) || length(legend) != 1L || is.na(legend)) {
+    stop("legend must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!is.numeric(elevation) || length(elevation) != 1L || !is.finite(elevation) ||
+      elevation <= 0 || elevation >= 90) {
+    stop("elevation must be a single number greater than 0 and less than 90 degrees.",
+         call. = FALSE)
+  }
+  if (!is.numeric(azimuth) || length(azimuth) != 1L || !is.finite(azimuth) ||
+      azimuth < 10 || azimuth > 80) {
+    stop("azimuth must be a single number between 10 and 80 degrees.", call. = FALSE)
+  }
+
+  # Determine grid dimensions and vertical scaling.
   rows <- max(layout$row)
   cols <- max(layout$col)
 
   if (is.null(zmax)) zmax <- max(layout$value, na.rm = TRUE)
   heightscale <- if (isTRUE(zmax > 0)) zscale / zmax else 0
 
+  # Open an output device when a file is requested.
   if (!is.na(outfile)) {
     ext <- tolower(tools::file_ext(outfile))
     dev_open <- switch(ext,
@@ -144,8 +147,10 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
     on.exit(grDevices::dev.off(), add = TRUE)
   }
 
+  # Set up a canvas large enough for the projected grid and bars.
   corners <- expand.grid(x = c(0, cols), y = c(0, rows), z = c(0, zscale))
-  p <- iso_project(corners$x, corners$y, corners$z)
+  p <- iso_project(corners$x, corners$y, corners$z,
+                   elevation = elevation, azimuth = azimuth)
   pad <- 0.08 * max(diff(range(p$sx)), diff(range(p$sy)))
   graphics::par(mar = c(1, 1, if (is.null(main)) 1 else 3, 1))
   graphics::plot(NA, xlim = range(p$sx) + c(-pad, pad) * 2.2,
@@ -153,18 +158,23 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
                  asp = 1, axes = FALSE, xlab = "", ylab = "")
   if (!is.null(main)) graphics::title(main = main)
 
+  # Draw the floor grid.
   if (gridlines) {
     for (r in 0:rows) {
-      pr <- iso_project(c(0, cols), c(r, r), 0)
+      pr <- iso_project(c(0, cols), c(r, r), 0,
+                        elevation = elevation, azimuth = azimuth)
       graphics::lines(pr$sx, pr$sy, col = "grey85")
     }
     for (co in 0:cols) {
-      pc <- iso_project(c(co, co), c(0, rows), 0)
+      pc <- iso_project(c(co, co), c(0, rows), 0,
+                        elevation = elevation, azimuth = azimuth)
       graphics::lines(pc$sx, pc$sy, col = "grey85")
     }
   }
 
-  ord <- order(layout$row + layout$col)
+  # Draw bars from back to front for correct overlap.
+  azimuth_rad <- azimuth * pi / 180
+  ord <- order(layout$col * cos(azimuth_rad) + layout$row * sin(azimuth_rad))
   gapmargin <- gap / 2
   for (i in ord) {
     r <- layout$row[i]
@@ -172,39 +182,87 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
     draw_iso_bar(x0 = co - 1 + gapmargin, x1 = co - gapmargin,
                  y0 = r - 1 + gapmargin, y1 = r - gapmargin,
                  z1 = layout$value[i] * heightscale,
-                 topcolor = layout$color[i], border = border,
+                 topcolor = layout$color[i], alpha = alpha,
+                 elevation = elevation, azimuth = azimuth, border = border,
                  shade_top = shade_top, shade_front = shade_front, shade_right = shade_right)
   }
 
+  # Draw base labels along the projected axes.
   if (labels) {
+    elevation_rad <- elevation * pi / 180
+    axis_x <- c(-sin(azimuth_rad) / cos(elevation_rad),
+                -cos(azimuth_rad) * tan(elevation_rad))
+    axis_y <- c(cos(azimuth_rad) / cos(elevation_rad),
+                -sin(azimuth_rad) * tan(elevation_rad))
+    unit_x <- axis_x / sqrt(sum(axis_x^2))
+    unit_y <- axis_y / sqrt(sum(axis_y^2))
+    angle_x <- atan2(-axis_x[2], -axis_x[1]) * 180 / pi
+    angle_y <- atan2(axis_y[2], axis_y[1]) * 180 / pi
+
     for (co in seq_len(cols)) {
-      lp <- iso_project(co - 0.5, rows, 0)
-      graphics::text(lp$sx, lp$sy - pad * 0.3, rep(rev(c("T", "C", "A", "G")), cols / 4L)[co], cex = 0.8, xpd = NA)
+      lp <- iso_project(co - 0.5, rows, 0,
+                        elevation = elevation, azimuth = azimuth)
+      graphics::text(lp$sx + unit_y[1] * pad * 0.3,
+                     lp$sy + unit_y[2] * pad * 0.3,
+                     rep(rev(c("T", "C", "A", "G")), cols / 4L)[co],
+                     cex = 0.8, xpd = NA)
     }
     for (r in seq_len(rows)) {
-      lp <- iso_project(cols, r - 0.5, 0)
-      graphics::text(lp$sx - pad * 0.3, lp$sy, rep(c("T", "C", "A", "G"), rows / 4L)[r], cex = 0.8, xpd = NA)
+      lp <- iso_project(cols, r - 0.5, 0,
+                        elevation = elevation, azimuth = azimuth)
+      graphics::text(lp$sx + unit_x[1] * pad * 0.3,
+                     lp$sy + unit_x[2] * pad * 0.3,
+                     rep(c("T", "C", "A", "G"), rows / 4L)[r],
+                     cex = 0.8, xpd = NA)
     }
 
-    graphics::text(iso_project(cols,rows/2,0)$sx - 1, iso_project(cols,rows/2,0)$sy - .8 , "Preceding base",srt = -30, cex = 0.9, xpd = NA)
-    graphics::text(iso_project(cols/2,rows,0)$sx + 0.3, iso_project(cols/2,rows,0)$sy - 1.2, "Succeeding base", srt = 30, cex = 0.9, xpd = NA)
+    preceding <- iso_project(cols, rows / 2, 0,
+                             elevation = elevation, azimuth = azimuth)
+    succeeding <- iso_project(cols / 2, rows, 0,
+                              elevation = elevation, azimuth = azimuth)
+    graphics::text(preceding$sx + unit_x[1] * pad * 0.9,
+                   preceding$sy + unit_x[2] * pad * 0.9,
+                   "Preceding base", srt = angle_y, cex = 0.9, xpd = NA)
+    graphics::text(succeeding$sx + unit_y[1] * pad * 0.9,
+                   succeeding$sy + unit_y[2] * pad * 0.9,
+                   "Succeeding base", srt = angle_x, cex = 0.9, xpd = NA)
   }
 
+  # Draw the vertical scale and title.
   if (zlabels || !isFALSE(zsub)) {
-    z0 <- iso_project(12, 0, 0)
-    z1 <- iso_project(12, 0, zscale)
+    z0 <- iso_project(cols, 0, 0, elevation = elevation, azimuth = azimuth)
+    z1 <- iso_project(cols, 0, zscale, elevation = elevation, azimuth = azimuth)
     graphics::lines(c(z0$sx, z1$sx), c(z0$sy, z1$sy))
     if (zlabels) {
       for (frac in c(0, 0.5, 1)) {
-        zt <- iso_project(12, 0, zscale * frac)
+        zt <- iso_project(cols, 0, zscale * frac,
+                          elevation = elevation, azimuth = azimuth)
         graphics::segments(zt$sx, zt$sy, zt$sx - pad * 0.15, zt$sy)
         graphics::text(zt$sx - pad * 0.25, zt$sy, signif(zmax * frac, 3), cex = 0.75, adj = 1, xpd = NA)
       }
     }
     if (!isFALSE(zsub)) {
-      zm <- iso_project(12, 0, zscale / 2)
+      zm <- iso_project(cols, 0, zscale / 2,
+                        elevation = elevation, azimuth = azimuth)
       graphics::text(zm$sx - pad * 1.9, zm$sy, zsub, srt = 90, cex = 0.9, xpd = NA)
     }
+  }
+
+  # Draw the substitution-color legend.
+  if (legend) {
+    classes <- c("C>T", "C>A", "C>G", "T>C", "T>A", "T>G")
+    reverse_classes <- c("G>A", "G>T", "G>C","A>G", "A>T", "A>C")
+    class_colors <- layout$color[match(classes, substr(layout$substitution, 1, 3))]
+    graphics::legend(
+      "topright",
+      legend = paste(classes, "or", reverse_classes),
+      fill = class_colors,
+      border = "grey15",
+      bg = "white",
+      title = "Base Substitutions",
+      cex = 0.9,
+      inset = 0.02
+    )
   }
 
   invisible(layout)

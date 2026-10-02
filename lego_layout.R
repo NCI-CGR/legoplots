@@ -1,16 +1,6 @@
 #' Six-color palettes for lego plots
 #'
-#' Returns a vector of 6 hex colors, one per pyrimidine-based substitution
-#' class, in the order C>A, C>G, C>T, T>A, T>C, T>G.
-#'
-#' The \code{"mike"} preset's hex values were confirmed by sampling actual
-#' rendered pixels from both \code{sig9.png} and the small example plot in
-#' \code{lego_ref.png} -- the two agree with each other almost exactly, and
-#' with these hex values. (\code{lego_ref.png} also has a separate "Base
-#' substitutions" text legend with different, purer colors -- that legend
-#' does not match either rendered example plot's actual pixels, so it
-#' appears to document a different plot style, not this one; it is not used
-#' here.)
+#' Return six colors ordered C>A, C>G, C>T, T>A, T>C, T>G.
 #'
 #' @param sixcolors Either the name of a built-in palette ("broad", "sanger",
 #'   "mike"), or a custom vector of exactly 6 hexadecimal RGB colors in that
@@ -21,6 +11,7 @@
 #' lego_palette(c("#111111", "#222222", "#333333", "#444444", "#555555", "#666666"))
 #' @export
 lego_palette <- function(sixcolors = "sanger") {
+  # Define substitution classes and built-in palettes.
   substitution_classes <- c("C>A", "C>G", "C>T", "T>A", "T>C", "T>G")
   presets <- list(
     sanger = c("#55BAE9", "#000000", "#D23E32", "#CCC9CA", "#ABCD70", "#E6C7C6"),
@@ -28,6 +19,7 @@ lego_palette <- function(sixcolors = "sanger") {
     mike   = c("#4FAFB1", "#EA3323", "#FFFF54", "#794EAC", "#5FC941", "#547CE3")
   )
   
+  # Resolve a preset name or validate a custom palette.
   if (length(sixcolors) == 1 && is.character(sixcolors) && sixcolors %in% names(presets)) {
     sixcolors <- presets[[sixcolors]]
   }
@@ -39,24 +31,16 @@ lego_palette <- function(sixcolors = "sanger") {
   stats::setNames(unname(sixcolors), substitution_classes)
 }
 
-#' Resolve arbitrary contextdata input into standard-order values
+#' Resolve context values into plotting order
 #'
-#' Accepts either an unnamed length-96 vector (assumed to already be in the
-#' standard order documented in \code{\link{context96}}, i.e. the row order
-#' of \code{sigdata1.txt}), or a named vector whose names identify each
-#' context, in any order and even if incomplete. Matching by name is the
-#' recommended, reproducible way to pass data in: it can never silently
-#' produce a mismatched or mirrored plot the way a positional vector can if
-#' it happens to be in a slightly different order than expected.
-#'
-#' Names may use either standard SBS96 notation (e.g. \code{"A[C>A]A"}, as
-#' used by COSMIC/SigProfiler/MutationalPatterns) or the
-#' \code{sigdata1.txt}-style label (e.g. \code{"C>A|G>T_AxA"}).
+#' Match named SBS96 values to \code{context96}; unnamed values must already
+#' follow \code{context96} row order.
 #'
 #' @param contextdata A numeric vector of length 96, optionally named.
-#' @return A numeric vector of length 96, in \code{context96}'s standard order.
+#' @return A numeric vector of length 96 in plotting order.
 #' @export
 resolve_context_values <- function(contextdata) {
+  # Validate the input type and determine whether names are available.
   if (!is.numeric(contextdata)) {
     stop("contextdata must be numeric.", call. = FALSE)
   }
@@ -64,6 +48,7 @@ resolve_context_values <- function(contextdata) {
   nm <- names(contextdata)
   named <- !is.null(nm) && all(nzchar(nm))
 
+  # Accept positional input only when all 96 contexts are supplied.
   if (!named) {
     if (length(contextdata) != 96) {
       stop("Unnamed contextdata must have exactly 96 elements, in the standard order ",
@@ -74,6 +59,7 @@ resolve_context_values <- function(contextdata) {
     return(as.numeric(contextdata))
   }
 
+  # Match either SBS96 names or expanded labels.
   idx <- match(nm, context96$context)
   unmatched <- is.na(idx)
   if (any(unmatched)) {
@@ -92,6 +78,7 @@ resolve_context_values <- function(contextdata) {
             call. = FALSE)
   }
 
+  # Fill missing named contexts with zero.
   values <- numeric(96)
   values[idx] <- as.numeric(contextdata)
   values
@@ -99,27 +86,7 @@ resolve_context_values <- function(contextdata) {
 
 #' Compute the bar layout for a mutational-context lego plot
 #'
-#' Pure, side-effect-free computation of everything needed to draw a lego
-#' plot: which grid cell each context occupies, its bar height, and its
-#' color. Because it does no plotting, it can be inspected, unit-tested, or
-#' fed to a different renderer without requiring rgl or any graphics device.
-#'
-#' Grid position \code{k} (1-96, in row-major order) shows the VALUE and
-#' IDENTITY of standard-order context \code{context96$order[k]} -- this is
-#' exactly the \code{contextdata[porder]} reordering from the original
-#' \code{legoplot.R}, applied as a gather (\code{result[k] = x[porder[k]]}),
-#' not a sort. Its COLOR, however, is deliberately taken from a *different*
-#' standard-order context, \code{neworder[k]}: this reproduces the original
-#' package's "Mike Lawrence lab" layout, where the six color regions form a
-#' fixed spatial template on the grid rather than tracking the substitution
-#' class of whatever value \code{porder} happens to place in each cell.
-#'
-#' This was confirmed empirically, not assumed: a fresh legacy \code{rgl}
-#' render (from the untouched \code{bar3d.R}/\code{barplot3d.R}/\code{legoplot.R})
-#' and the small example plot in \code{lego_ref.png} both show this same
-#' fixed-template coloring and both use the same \code{"mike"} hex values
-#' (see \code{\link{lego_palette}}) -- so it is reproduced here on purpose
-#' for visual fidelity to those established figures, not a leftover bug.
+#' Assign each context its grid position, value, and color.
 #'
 #' @param contextdata A numeric vector of length 96 (see
 #'   \code{\link{resolve_context_values}} for accepted formats).
@@ -132,10 +99,12 @@ resolve_context_values <- function(contextdata) {
 #' head(layout)
 #' @export
 compute_lego_layout <- function(contextdata, sixcolors = "mike") {
+  # Resolve input values and palette colors.
   cols <- 8L
   values <- resolve_context_values(contextdata)
   palette <- lego_palette(sixcolors)
 
+  # Attach values, colors, and grid coordinates to the context table.
   k <- seq_len(nrow(context96))
   tab <- context96
   tab$value <- values
