@@ -20,12 +20,14 @@ For development, `devtools::load_all()` also works if devtools is installed.
 ```r
 library(legoplots)
 
-x <- setNames(seq_len(96), context96$context)
-x <- x / sum(x)
+cosmic <- read_sigprofiler_sbs96("COSMIC_v3.6_SBS_GRCh38.txt")
 
-legoplot3d(x, labels = TRUE, zsub = "Probability",
-           main = "Example SBS96 profile", outfile = "example.pdf")
+legoplot3d(cosmic, sample = "SBS40a", labels = TRUE,
+           zsub = "Probability", main = "COSMIC SBS40a",
+           outfile = "SBS40a.pdf")
 ```
+
+![Static lego plot of COSMIC SBS40a](SBS40a_cosmic.png)
 
 This works identically whether you run it in RStudio, from `Rscript` on a
 server with no display, or inside a Docker container — `outfile` just opens
@@ -73,7 +75,8 @@ required.
 install.packages("gifski")
 
 animate_legoplot3d(
-  x,
+  cosmic,
+  sample = "SBS40a",
   outfile = "legoplot.gif",
   n_frames = 48,
   fps = 12,
@@ -83,6 +86,8 @@ animate_legoplot3d(
   zsub = "Probability"
 )
 ```
+
+![Animated lego plot of COSMIC SBS40a](legoplot.gif)
 
 The camera follows a closed elliptical path, so the animation loops without
 repeating the first frame at the end. It uses an orthographic projection that
