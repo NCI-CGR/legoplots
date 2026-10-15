@@ -7,9 +7,10 @@
 #'   \item{order}{Position in the plotting grid.}
 #'   \item{substitution}{Pyrimidine-based substitution class.}
 #'   \item{preceding, succeeding}{Flanking bases.}
-#'   \item{context}{SBS96 notation, e.g. "A[C>A]A".}
+#'   \item{context}{Standard SBS96 trinucleotide notation.}
 #'   \item{label}{Expanded label, e.g. "C>A|G>T_AxA".}
 #' }
+#' @export
 context96 <- local({
 
   substitution_classes <- c("C>T|G>A", "T>C|A>G", "C>A|G>T", "T>G|A>C", "C>G|G>C", "T>A|A>T")

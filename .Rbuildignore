@@ -1,0 +1,11 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.git$
+^\.gitignore$
+^load_legoplots\.R$
+^scratch\.r$
+^testrun\.R$
+^sigdata1\.txt$
+^.*\.(png|gif)$
+^.*\.Rcheck$
+^legoplots_.*\.tar\.gz$

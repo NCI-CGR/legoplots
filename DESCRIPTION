@@ -1,0 +1,21 @@
+Package: legoplots
+Title: Three-Dimensional Lego Plots for Mutational Signatures
+Version: 0.1.0
+Authors@R: 
+    person("Ramin", "Sakhtemani", email = "ramin.sakhtemani@nih.gov",
+           role = c("aut", "cre"))
+Description: Draws SBS96 mutational spectra as static, projected
+    three-dimensional bar plots. The implementation uses base R graphics,
+    works on headless systems, and provides separate functions for computing
+    plot layouts and rendering them.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Depends: 
+    R (>= 3.5.0)
+Imports:
+    grDevices,
+    graphics,
+    stats,
+    tools
+Config/roxygen2/version: 8.1.0
