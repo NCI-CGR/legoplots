@@ -7,6 +7,7 @@
 legoplot3d(
   contextdata,
   sixcolors = "mike",
+  sample = NULL,
   gap = 0.2,
   zscale = 3,
   zmax = NULL,
@@ -26,10 +27,14 @@ legoplot3d(
 )
 }
 \arguments{
-\item{contextdata}{Numeric mutation-context values; names are recommended.}
+\item{contextdata}{Numeric mutation-context values; a SigProfiler matrix or
+data frame; or a path to a tab-delimited SigProfiler SBS96 matrix.}
 
 \item{sixcolors}{Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
-or a custom vector of 6 hex colors (see \code{\link{lego_palette}}).}
+or a custom vector of 6 colors (see \code{\link{lego_palette}}).}
+
+\item{sample}{Sample or signature column name or number when \code{contextdata}
+is a SigProfiler matrix. May be omitted for a one-column matrix.}
 
 \item{gap}{Fraction (0-1) of each grid cell left empty as a gap between bars.}
 
@@ -68,13 +73,10 @@ The computed layout data frame, invisibly.
 Draw an SBS96 spectrum as a static projected 3D bar plot.
 }
 \examples{
+x <- setNames(seq_len(96), context96$context)
+legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Count")
 \dontrun{
-sigdata <- read.table("sigdata1.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
-x <- sigdata$Signature_2
-names(x) <- sigdata$Somatic_mutation_type
-legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Probability")
-
-# Headless / CLI / CI, no graphics display needed:
-legoplot3d(x, outfile = "sig2.png")
+# Plot a sample directly from a SigProfiler SBS96 matrix.
+legoplot3d("project.SBS96.all", sample = "Sample1", outfile = "sample1.pdf")
 }
 }

@@ -2,9 +2,12 @@
 #'
 #' Draw an SBS96 spectrum as a static projected 3D bar plot.
 #'
-#' @param contextdata Numeric mutation-context values; names are recommended.
+#' @param contextdata Numeric mutation-context values; a SigProfiler matrix or
+#'   data frame; or a path to a tab-delimited SigProfiler SBS96 matrix.
 #' @param sixcolors Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
-#'   or a custom vector of 6 hex colors (see \code{\link{lego_palette}}).
+#'   or a custom vector of 6 colors (see \code{\link{lego_palette}}).
+#' @param sample Sample or signature column name or number when `contextdata`
+#'   is a SigProfiler matrix. May be omitted for a one-column matrix.
 #' @param gap Fraction (0-1) of each grid cell left empty as a gap between bars.
 #' @param zscale Height, in grid units, that the tallest bar should reach.
 #' @param zmax Data value mapped to \code{zscale}; defaults to the maximum value.
@@ -22,22 +25,31 @@
 #' @param res Resolution in dpi, used for PNG output.
 #' @return The computed layout data frame, invisibly.
 #' @examples
+#' x <- setNames(seq_len(96), context96$context)
+#' legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Count")
 #' \dontrun{
-#' sigdata <- read.table("sigdata1.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
-#' x <- sigdata$Signature_2
-#' names(x) <- sigdata$Somatic_mutation_type
-#' legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Probability")
-#'
-#' # Headless / CLI / CI, no graphics display needed:
-#' legoplot3d(x, outfile = "sig2.png")
+#' # Plot a sample directly from a SigProfiler SBS96 matrix.
+#' legoplot3d("project.SBS96.all", sample = "Sample1", outfile = "sample1.pdf")
 #' }
 #' @export
-legoplot3d <- function(contextdata, sixcolors = "mike", gap = 0.2, zscale = 3, zmax = NULL,
+legoplot3d <- function(contextdata, sixcolors = "mike", sample = NULL, gap = 0.2,
+                        zscale = 3, zmax = NULL,
                         labels = FALSE, zlabels = TRUE, zsub = FALSE, gridlines = TRUE,
                         main = NULL, legend = FALSE, alpha = 1,
                         elevation = 35.26439, azimuth = 45,
                         outfile = NA,
                         width = 1000, height = 800, res = 150) {
+
+  # Select a column when given a SigProfiler file or matrix.
+  if (!(is.numeric(contextdata) && is.null(dim(contextdata)))) {
+    contextdata <- select_sigprofiler_sample(
+      read_sigprofiler_sbs96(contextdata),
+      sample = sample
+    )
+  } else if (!is.null(sample)) {
+    stop("sample is only used with SigProfiler files, matrices, or data frames.",
+         call. = FALSE)
+  }
 
   # Resolve values, colors, and grid positions.
   layout <- compute_lego_layout(contextdata, sixcolors = sixcolors)

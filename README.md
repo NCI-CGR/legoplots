@@ -2,8 +2,8 @@
 
 Draws the 96-trinucleotide-context mutational spectrum of a sample or
 signature as a "lego plot" — a 3D-style bar plot, in the layout convention
-used by Mike Lawrence's lab (MGH) — as an alternative to the flat 2D
-spectrum plots used by COSMIC/Sanger.
+as an alternative to the flat 2D spectrum plots used by COSMIC/Sanger.
+The 3D style helps one to see context patterns more easily. 
 
 ## Installation
 
@@ -20,12 +20,11 @@ For development, `devtools::load_all()` also works if devtools is installed.
 ```r
 library(legoplots)
 
-sigdata <- read.table("sigdata1.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
-x <- sigdata$Signature_2
-names(x) <- context96$context   # e.g. "A[C>A]A" -- sigdata1.txt happens to already be in this order
+x <- setNames(seq_len(96), context96$context)
+x <- x / sum(x)
 
 legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Probability",
-           main = "Signature 2", outfile = "sig2.png")
+           main = "Example SBS96 profile", outfile = "example.pdf")
 ```
 
 This works identically whether you run it in RStudio, from `Rscript` on a
@@ -43,10 +42,10 @@ locally or in a minimal container.
 
 ## API
 
-- `context96` — the 96-context lookup table (`context`, `label`, `order`,
-  `substitution`, `color_group`, ...), sourced from `sigdata1.txt`.
+- `context96` — the embedded 96-context lookup table (`context`, `label`,
+  `order`, `substitution`, `preceding`, and `succeeding`).
 - `lego_palette(sixcolors)` — `"broad"` / `"sanger"` / `"mike"`, or your own
-  vector of 6 hex colors (order: C>A, C>G, C>T, T>A, T>C, T>G).
+  vector of 6 R colors (order: C>A, C>G, C>T, T>A, T>C, T>G).
 - `resolve_context_values(contextdata)` — matches a named or positional
   input vector against `context96`; errors clearly on unrecognized names
   instead of silently mis-plotting.
@@ -59,6 +58,36 @@ locally or in a minimal container.
   and `outfile`/`width`/`height`/`res`.
 - `legoplot3d(contextdata, ...)` — the convenience wrapper: layout + render
   in one call, with the combined parameter set above.
+- `read_sigprofiler_sbs96(x)` — imports SigProfiler SBS96 files, matrices, or
+  data frames and returns a context-by-sample matrix.
+
+## SigProfiler Suite
+
+SigProfilerMatrixGenerator and SigProfilerExtractor SBS96 matrices can be
+plotted directly. Select a sample or signature when the file has more than
+one numeric column:
+
+```r
+legoplot3d(
+  "output/SBS/project.SBS96.all",
+  sample = "Sample1",
+  labels = TRUE,
+  zsub = "Mutation count",
+  outfile = "Sample1.pdf"
+)
+```
+
+You can also import once and reuse the resulting matrix:
+
+```r
+sbs96 <- read_sigprofiler_sbs96("output/SBS/project.SBS96.all")
+legoplot3d(sbs96, sample = "Sample1")
+```
+
+The importer accepts `MutationType` and `Mutation Types` context columns,
+contexts stored as row names, transposed matrices with contexts as columns,
+and files containing separate substitution and trinucleotide columns.
+Strand-prefixed contexts are collapsed to SBS96 by summing strands.
 
 ## Input format
 

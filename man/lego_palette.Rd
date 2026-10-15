@@ -8,7 +8,7 @@ lego_palette(sixcolors = "sanger")
 }
 \arguments{
 \item{sixcolors}{Either the name of a built-in palette ("broad", "sanger",
-"mike"), or a custom vector of exactly 6 hexadecimal RGB colors in that
+"mike"), or a custom vector of exactly 6 valid R colors in that
 same substitution-class order.}
 }
 \value{

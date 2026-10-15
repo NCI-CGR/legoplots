@@ -92,7 +92,8 @@ draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, alpha = 1,
 #' @param shade_top,shade_front,shade_right Face brightness multipliers.
 #' @param border Outline color for bar faces.
 #' @param outfile Output path, or \code{NA} for the current graphics device.
-#' @param width,height Output size in pixels (PNG) or inches (PDF/SVG).
+#' @param width,height Output size in pixels. PDF/SVG dimensions in inches are
+#'   calculated as `width / res` and `height / res`.
 #' @param res Resolution in dpi, used for PNG output.
 #' @return The \code{layout} data frame, invisibly.
 #' @examples
@@ -110,13 +111,67 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
                            border = "grey15",
                            outfile = NA, width = 1000, height = 800, res = 150) {
 
-  # Validate view and transparency options.
+  # Validate the layout before using it to establish graphics coordinates.
+  required <- c("row", "col", "substitution", "value", "color")
+  if (!is.data.frame(layout) || !nrow(layout) ||
+      !all(required %in% names(layout))) {
+    stop("layout must be a non-empty data frame returned by compute_lego_layout().",
+         call. = FALSE)
+  }
+  if (!is.numeric(layout$row) || !is.numeric(layout$col) ||
+      any(!is.finite(layout$row)) || any(!is.finite(layout$col)) ||
+      any(layout$row < 1 | layout$row != as.integer(layout$row)) ||
+      any(layout$col < 1 | layout$col != as.integer(layout$col))) {
+    stop("layout row and col values must be positive integers.", call. = FALSE)
+  }
+  if (!is.numeric(layout$value) || any(!is.finite(layout$value)) ||
+      any(layout$value < 0)) {
+    stop("layout values must be finite, non-negative numbers.", call. = FALSE)
+  }
+  valid_layout_colors <- tryCatch({
+    grDevices::col2rgb(layout$color)
+    TRUE
+  }, error = function(e) FALSE)
+  if (!valid_layout_colors) {
+    stop("layout contains an invalid color.", call. = FALSE)
+  }
+
+  # Validate view, scaling, and transparency options.
+  if (!is.numeric(gap) || length(gap) != 1L || !is.finite(gap) ||
+      gap < 0 || gap >= 1) {
+    stop("gap must be a single number greater than or equal to 0 and less than 1.",
+         call. = FALSE)
+  }
+  if (!is.numeric(zscale) || length(zscale) != 1L || !is.finite(zscale) ||
+      zscale <= 0) {
+    stop("zscale must be a single positive number.", call. = FALSE)
+  }
+  if (!is.null(zmax) && (!is.numeric(zmax) || length(zmax) != 1L ||
+      !is.finite(zmax) || zmax <= 0)) {
+    stop("zmax must be NULL or a single positive number.", call. = FALSE)
+  }
   if (!is.numeric(alpha) || length(alpha) != 1L || !is.finite(alpha) ||
       alpha < 0 || alpha > 1) {
     stop("alpha must be a single number between 0 and 1.", call. = FALSE)
   }
   if (!is.logical(legend) || length(legend) != 1L || is.na(legend)) {
     stop("legend must be TRUE or FALSE.", call. = FALSE)
+  }
+  logical_options <- list(labels = labels, zlabels = zlabels, gridlines = gridlines)
+  invalid_logical <- !vapply(logical_options, function(x) {
+    is.logical(x) && length(x) == 1L && !is.na(x)
+  }, logical(1))
+  if (any(invalid_logical)) {
+    stop(paste(names(logical_options)[invalid_logical], collapse = ", "),
+         " must be TRUE or FALSE.", call. = FALSE)
+  }
+  if (!(identical(zsub, FALSE) ||
+        (is.character(zsub) && length(zsub) == 1L && !is.na(zsub)))) {
+    stop("zsub must be FALSE or a single character string.", call. = FALSE)
+  }
+  if (!(is.null(main) ||
+        (is.character(main) && length(main) == 1L && !is.na(main)))) {
+    stop("main must be NULL or a single character string.", call. = FALSE)
   }
   if (!is.numeric(elevation) || length(elevation) != 1L || !is.finite(elevation) ||
       elevation <= 0 || elevation >= 90) {
@@ -127,6 +182,31 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
       azimuth < 10 || azimuth > 80) {
     stop("azimuth must be a single number between 10 and 80 degrees.", call. = FALSE)
   }
+  shades <- c(shade_top = shade_top, shade_front = shade_front,
+              shade_right = shade_right)
+  if (!is.numeric(shades) || any(!is.finite(shades)) || any(shades < 0)) {
+    stop("Face-shading factors must be finite, non-negative numbers.", call. = FALSE)
+  }
+  if (length(border) != 1L || (!is.na(border) && !is.character(border))) {
+    stop("border must be NA or one valid R color.", call. = FALSE)
+  }
+  if (!is.na(border)) {
+    valid_border <- tryCatch({
+      grDevices::col2rgb(border)
+      TRUE
+    }, error = function(e) FALSE)
+    if (!valid_border) stop("border must be NA or one valid R color.", call. = FALSE)
+  }
+  dimensions <- c(width = width, height = height, res = res)
+  if (!is.numeric(dimensions) || any(!is.finite(dimensions)) ||
+      any(dimensions <= 0)) {
+    stop("width, height, and res must be positive numbers.", call. = FALSE)
+  }
+  use_current_device <- length(outfile) == 1L && is.na(outfile)
+  if (!use_current_device &&
+      (!is.character(outfile) || length(outfile) != 1L || !nzchar(outfile))) {
+    stop("outfile must be NA or one non-empty file path.", call. = FALSE)
+  }
 
   # Determine grid dimensions and vertical scaling.
   rows <- max(layout$row)
@@ -136,19 +216,30 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
   heightscale <- if (isTRUE(zmax > 0)) zscale / zmax else 0
 
   # Open an output device when a file is requested.
-  if (!is.na(outfile)) {
+  if (!use_current_device) {
     ext <- tolower(tools::file_ext(outfile))
+    if (!ext %in% c("png", "pdf", "svg")) {
+      stop("outfile must use a .png, .pdf, or .svg extension.", call. = FALSE)
+    }
     dev_open <- switch(ext,
       pdf = function() grDevices::pdf(outfile, width = width / res, height = height / res),
       svg = function() grDevices::svg(outfile, width = width / res, height = height / res),
       function() grDevices::png(outfile, width = width, height = height, res = res)
     )
+    previous_device <- grDevices::dev.cur()
     dev_open()
+    if (identical(grDevices::dev.cur(), previous_device)) {
+      stop("The ", toupper(ext), " graphics device could not be opened.", call. = FALSE)
+    }
     on.exit(grDevices::dev.off(), add = TRUE)
+  } else {
+    old_par <- graphics::par(no.readonly = TRUE)
+    on.exit(graphics::par(old_par), add = TRUE)
   }
 
   # Set up a canvas large enough for the projected grid and bars.
-  corners <- expand.grid(x = c(0, cols), y = c(0, rows), z = c(0, zscale))
+  plotted_zmax <- max(zscale, layout$value * heightscale)
+  corners <- expand.grid(x = c(0, cols), y = c(0, rows), z = c(0, plotted_zmax))
   p <- iso_project(corners$x, corners$y, corners$z,
                    elevation = elevation, azimuth = azimuth)
   pad <- 0.08 * max(diff(range(p$sx)), diff(range(p$sy)))

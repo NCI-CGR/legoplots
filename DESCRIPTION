@@ -17,5 +17,6 @@ Imports:
     grDevices,
     graphics,
     stats,
-    tools
+    tools,
+    utils
 Config/roxygen2/version: 8.1.0

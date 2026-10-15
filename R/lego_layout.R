@@ -3,7 +3,7 @@
 #' Return six colors ordered C>A, C>G, C>T, T>A, T>C, T>G.
 #'
 #' @param sixcolors Either the name of a built-in palette ("broad", "sanger",
-#'   "mike"), or a custom vector of exactly 6 hexadecimal RGB colors in that
+#'   "mike"), or a custom vector of exactly 6 valid R colors in that
 #'   same substitution-class order.
 #' @return A named character vector of 6 hex colors.
 #' @examples
@@ -23,10 +23,17 @@ lego_palette <- function(sixcolors = "sanger") {
   if (length(sixcolors) == 1 && is.character(sixcolors) && sixcolors %in% names(presets)) {
     sixcolors <- presets[[sixcolors]]
   }
-  if (length(sixcolors) != 6) {
+  if (!is.character(sixcolors) || length(sixcolors) != 6L || anyNA(sixcolors)) {
     stop("sixcolors must be one of ", paste(shQuote(names(presets)), collapse = ", "),
-         ", or a vector of 6 hex colors ordered ", paste(substitution_classes, collapse = ", "),
+         ", or a character vector of 6 colors ordered ", paste(substitution_classes, collapse = ", "),
          ".", call. = FALSE)
+  }
+  valid_colors <- tryCatch({
+    grDevices::col2rgb(sixcolors)
+    TRUE
+  }, error = function(e) FALSE)
+  if (!valid_colors) {
+    stop("sixcolors contains an invalid R color.", call. = FALSE)
   }
   stats::setNames(unname(sixcolors), substitution_classes)
 }
@@ -44,9 +51,22 @@ resolve_context_values <- function(contextdata) {
   if (!is.numeric(contextdata)) {
     stop("contextdata must be numeric.", call. = FALSE)
   }
+  if (length(contextdata) == 0L) {
+    stop("contextdata must contain at least one value.", call. = FALSE)
+  }
+  if (any(!is.finite(contextdata))) {
+    stop("contextdata must not contain NA, NaN, or infinite values.", call. = FALSE)
+  }
+  if (any(contextdata < 0)) {
+    stop("contextdata must not contain negative values.", call. = FALSE)
+  }
 
   nm <- names(contextdata)
-  named <- !is.null(nm) && all(nzchar(nm))
+  if (!is.null(nm) && any(!nzchar(nm))) {
+    stop("contextdata must be either completely named or completely unnamed; blank names are not allowed.",
+         call. = FALSE)
+  }
+  named <- !is.null(nm)
 
   # Accept positional input only when all 96 contexts are supplied.
   if (!named) {

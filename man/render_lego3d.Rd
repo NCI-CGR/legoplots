@@ -61,7 +61,8 @@ render_lego3d(
 
 \item{outfile}{Output path, or \code{NA} for the current graphics device.}
 
-\item{width, height}{Output size in pixels (PNG) or inches (PDF/SVG).}
+\item{width, height}{Output size in pixels. PDF/SVG dimensions in inches are
+calculated as \code{width / res} and \code{height / res}.}
 
 \item{res}{Resolution in dpi, used for PNG output.}
 }
