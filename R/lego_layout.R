@@ -2,7 +2,7 @@
 #'
 #' Return six colors ordered C>A, C>G, C>T, T>A, T>C, T>G.
 #'
-#' @param sixcolors Either the name of a built-in palette ("broad", "sanger",
+#' @param colors Either the name of a built-in palette ("broad", "sanger",
 #'   "mike"), or a custom vector of exactly 6 valid R colors in that
 #'   same substitution-class order.
 #' @return A named character vector of 6 hex colors.
@@ -10,32 +10,32 @@
 #' lego_palette("mike")
 #' lego_palette(c("#111111", "#222222", "#333333", "#444444", "#555555", "#666666"))
 #' @export
-lego_palette <- function(sixcolors = "sanger") {
+lego_palette <- function(colors = "sanger") {
   # Define substitution classes and built-in palettes.
   substitution_classes <- c("C>A", "C>G", "C>T", "T>A", "T>C", "T>G")
   presets <- list(
-    sanger = c("#55BAE9", "#000000", "#D23E32", "#CCC9CA", "#ABCD70", "#E6C7C6"),
+    sanger = c("#55BAE9", "#404040", "#D23E32", "#d4d0d2", "#ABCD70", "#E6C7C6"),
     broad  = c("#547CE3", "#805D3F", "#FFFF54", "#794EAC", "#5FC941", "#1232C4"),
     mike   = c("#4FAFB1", "#EA3323", "#FFFF54", "#794EAC", "#5FC941", "#547CE3")
   )
   
   # Resolve a preset name or validate a custom palette.
-  if (length(sixcolors) == 1 && is.character(sixcolors) && sixcolors %in% names(presets)) {
-    sixcolors <- presets[[sixcolors]]
+  if (length(colors) == 1 && is.character(colors) && colors %in% names(presets)) {
+    colors <- presets[[colors]]
   }
-  if (!is.character(sixcolors) || length(sixcolors) != 6L || anyNA(sixcolors)) {
-    stop("sixcolors must be one of ", paste(shQuote(names(presets)), collapse = ", "),
+  if (!is.character(colors) || length(colors) != 6L || anyNA(colors)) {
+    stop("colors must be one of ", paste(shQuote(names(presets)), collapse = ", "),
          ", or a character vector of 6 colors ordered ", paste(substitution_classes, collapse = ", "),
          ".", call. = FALSE)
   }
   valid_colors <- tryCatch({
-    grDevices::col2rgb(sixcolors)
+    grDevices::col2rgb(colors)
     TRUE
   }, error = function(e) FALSE)
   if (!valid_colors) {
-    stop("sixcolors contains an invalid R color.", call. = FALSE)
+    stop("colors contains an invalid R color.", call. = FALSE)
   }
-  stats::setNames(unname(sixcolors), substitution_classes)
+  stats::setNames(unname(colors), substitution_classes)
 }
 
 #' Resolve context values into plotting order
@@ -110,7 +110,7 @@ resolve_context_values <- function(contextdata) {
 #'
 #' @param contextdata A numeric vector of length 96 (see
 #'   \code{\link{resolve_context_values}} for accepted formats).
-#' @param sixcolors Palette, see \code{\link{lego_palette}}.
+#' @param colors Palette, see \code{\link{lego_palette}}.
 #' @return A data frame with one row per grid cell, in plotting order, with
 #'   columns \code{order}, \code{row}, \code{col}, \code{context},
 #'   \code{label}, \code{substitution}, \code{value}, \code{color}.
@@ -118,11 +118,11 @@ resolve_context_values <- function(contextdata) {
 #' layout <- compute_lego_layout(setNames(runif(96), context96$context))
 #' head(layout)
 #' @export
-compute_lego_layout <- function(contextdata, sixcolors = "mike") {
+compute_lego_layout <- function(contextdata, colors = "sanger") {
   # Resolve input values and palette colors.
   cols <- 8L
   values <- resolve_context_values(contextdata)
-  palette <- lego_palette(sixcolors)
+  palette <- lego_palette(colors)
 
   # Attach values, colors, and grid coordinates to the context table.
   k <- seq_len(nrow(context96))

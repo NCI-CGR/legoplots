@@ -4,13 +4,13 @@
 \alias{compute_lego_layout}
 \title{Compute the bar layout for a mutational-context lego plot}
 \usage{
-compute_lego_layout(contextdata, sixcolors = "mike")
+compute_lego_layout(contextdata, colors = "sanger")
 }
 \arguments{
 \item{contextdata}{A numeric vector of length 96 (see
 \code{\link{resolve_context_values}} for accepted formats).}
 
-\item{sixcolors}{Palette, see \code{\link{lego_palette}}.}
+\item{colors}{Palette, see \code{\link{lego_palette}}.}
 }
 \value{
 A data frame with one row per grid cell, in plotting order, with

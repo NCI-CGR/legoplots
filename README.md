@@ -23,7 +23,7 @@ library(legoplots)
 x <- setNames(seq_len(96), context96$context)
 x <- x / sum(x)
 
-legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Probability",
+legoplot3d(x, labels = TRUE, zsub = "Probability",
            main = "Example SBS96 profile", outfile = "example.pdf")
 ```
 
@@ -58,8 +58,36 @@ locally or in a minimal container.
   and `outfile`/`width`/`height`/`res`.
 - `legoplot3d(contextdata, ...)` — the convenience wrapper: layout + render
   in one call, with the combined parameter set above.
+- `animate_legoplot3d(contextdata, ...)` — renders a gently moving camera path
+  as an animated GIF.
 - `read_sigprofiler_sbs96(x)` — imports SigProfiler SBS96 files, matrices, or
   data frames and returns a context-by-sample matrix.
+
+## Animated GIFs
+
+Static plots use only base R. Animated GIF encoding requires the optional,
+single-purpose `gifski` package; ImageMagick and command-line tools are not
+required.
+
+```r
+install.packages("gifski")
+
+animate_legoplot3d(
+  x,
+  outfile = "legoplot.gif",
+  n_frames = 48,
+  fps = 12,
+  azimuth_amplitude = 15,
+  elevation_amplitude = 7,
+  labels = TRUE,
+  zsub = "Probability"
+)
+```
+
+The camera follows a closed elliptical path, so the animation loops without
+repeating the first frame at the end. It uses an orthographic projection that
+does not introduce elevation-dependent zoom. Temporary PNG frames are deleted
+even if rendering or encoding fails.
 
 ## SigProfiler Suite
 

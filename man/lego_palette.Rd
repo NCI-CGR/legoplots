@@ -4,10 +4,10 @@
 \alias{lego_palette}
 \title{Six-color palettes for lego plots}
 \usage{
-lego_palette(sixcolors = "sanger")
+lego_palette(colors = "sanger")
 }
 \arguments{
-\item{sixcolors}{Either the name of a built-in palette ("broad", "sanger",
+\item{colors}{Either the name of a built-in palette ("broad", "sanger",
 "mike"), or a custom vector of exactly 6 valid R colors in that
 same substitution-class order.}
 }

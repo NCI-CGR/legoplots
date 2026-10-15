@@ -4,7 +4,7 @@
 #'
 #' @param contextdata Numeric mutation-context values; a SigProfiler matrix or
 #'   data frame; or a path to a tab-delimited SigProfiler SBS96 matrix.
-#' @param sixcolors Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
+#' @param colors Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
 #'   or a custom vector of 6 colors (see \code{\link{lego_palette}}).
 #' @param sample Sample or signature column name or number when `contextdata`
 #'   is a SigProfiler matrix. May be omitted for a one-column matrix.
@@ -26,13 +26,13 @@
 #' @return The computed layout data frame, invisibly.
 #' @examples
 #' x <- setNames(seq_len(96), context96$context)
-#' legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Count")
+#' legoplot3d(x, labels = TRUE, zsub = "Count")
 #' \dontrun{
 #' # Plot a sample directly from a SigProfiler SBS96 matrix.
 #' legoplot3d("project.SBS96.all", sample = "Sample1", outfile = "sample1.pdf")
 #' }
 #' @export
-legoplot3d <- function(contextdata, sixcolors = "mike", sample = NULL, gap = 0.2,
+legoplot3d <- function(contextdata, colors = "sanger", sample = NULL, gap = 0.2,
                         zscale = 3, zmax = NULL,
                         labels = FALSE, zlabels = TRUE, zsub = FALSE, gridlines = TRUE,
                         main = NULL, legend = FALSE, alpha = 1,
@@ -40,19 +40,10 @@ legoplot3d <- function(contextdata, sixcolors = "mike", sample = NULL, gap = 0.2
                         outfile = NA,
                         width = 1000, height = 800, res = 150) {
 
-  # Select a column when given a SigProfiler file or matrix.
-  if (!(is.numeric(contextdata) && is.null(dim(contextdata)))) {
-    contextdata <- select_sigprofiler_sample(
-      read_sigprofiler_sbs96(contextdata),
-      sample = sample
-    )
-  } else if (!is.null(sample)) {
-    stop("sample is only used with SigProfiler files, matrices, or data frames.",
-         call. = FALSE)
-  }
+  contextdata <- resolve_legoplot_input(contextdata, sample = sample)
 
   # Resolve values, colors, and grid positions.
-  layout <- compute_lego_layout(contextdata, sixcolors = sixcolors)
+  layout <- compute_lego_layout(contextdata, colors = colors)
 
   # Render the completed layout.
   render_lego3d(layout, gap = gap, zscale = zscale, zmax = zmax,
@@ -61,4 +52,18 @@ legoplot3d <- function(contextdata, sixcolors = "mike", sample = NULL, gap = 0.2
                 elevation = elevation, azimuth = azimuth,
                 outfile = outfile,
                 width = width, height = height, res = res)
+}
+
+resolve_legoplot_input <- function(contextdata, sample = NULL) {
+  if (!(is.numeric(contextdata) && is.null(dim(contextdata)))) {
+    return(select_sigprofiler_sample(
+      read_sigprofiler_sbs96(contextdata),
+      sample = sample
+    ))
+  }
+  if (!is.null(sample)) {
+    stop("sample is only used with SigProfiler files, matrices, or data frames.",
+         call. = FALSE)
+  }
+  contextdata
 }

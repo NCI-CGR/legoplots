@@ -28,10 +28,12 @@ iso_project <- function(x, y, z = 0, elevation = 35.26439, azimuth = 45) {
   elevation <- elevation * pi / 180
   azimuth <- azimuth * pi / 180
 
-  # Project while keeping z measured in grid units.
+  # Standard orthographic projection. Avoid dividing by cos(elevation), which
+  # would apply an elevation-dependent zoom as the camera moves.
   list(
-    sx = (y * cos(azimuth) - x * sin(azimuth)) / cos(elevation),
-    sy = -(x * cos(azimuth) + y * sin(azimuth)) * tan(elevation) + z
+    sx = y * cos(azimuth) - x * sin(azimuth),
+    sy = -(x * cos(azimuth) + y * sin(azimuth)) * sin(elevation) +
+      z * cos(elevation)
   )
 }
 
@@ -97,7 +99,7 @@ draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, alpha = 1,
 #' @param res Resolution in dpi, used for PNG output.
 #' @return The \code{layout} data frame, invisibly.
 #' @examples
-#' layout <- compute_lego_layout(setNames(runif(96), context96$context), sixcolors = "mike")
+#' layout <- compute_lego_layout(setNames(runif(96), context96$context))
 #' render_lego3d(layout, labels = TRUE, zsub = "Probability")
 #' \dontrun{
 #' render_lego3d(layout, outfile = "sig.png")   # works with no display at all
@@ -207,7 +209,6 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
       (!is.character(outfile) || length(outfile) != 1L || !nzchar(outfile))) {
     stop("outfile must be NA or one non-empty file path.", call. = FALSE)
   }
-
   # Determine grid dimensions and vertical scaling.
   rows <- max(layout$row)
   cols <- max(layout$col)
@@ -281,10 +282,10 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
   # Draw base labels along the projected axes.
   if (labels) {
     elevation_rad <- elevation * pi / 180
-    axis_x <- c(-sin(azimuth_rad) / cos(elevation_rad),
-                -cos(azimuth_rad) * tan(elevation_rad))
-    axis_y <- c(cos(azimuth_rad) / cos(elevation_rad),
-                -sin(azimuth_rad) * tan(elevation_rad))
+    axis_x <- c(-sin(azimuth_rad),
+                -cos(azimuth_rad) * sin(elevation_rad))
+    axis_y <- c(cos(azimuth_rad),
+                -sin(azimuth_rad) * sin(elevation_rad))
     unit_x <- axis_x / sqrt(sum(axis_x^2))
     unit_y <- axis_y / sqrt(sum(axis_y^2))
     angle_x <- atan2(-axis_x[2], -axis_x[1]) * 180 / pi

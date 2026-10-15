@@ -13,6 +13,9 @@ expect_error <- function(expr, pattern = NULL) {
 stopifnot(
   is.data.frame(context96),
   nrow(context96) == 96L,
+  identical(lego_palette(), lego_palette("sanger")),
+  identical(formals(legoplot3d)$colors, "sanger"),
+  identical(formals(animate_legoplot3d)$colors, "sanger"),
   identical(names(lego_palette("mike")),
             c("C>A", "C>G", "C>T", "T>A", "T>C", "T>G"))
 )
@@ -114,4 +117,51 @@ legoplot3d(values)
 stopifnot(identical(graphics::par("mar"), old_mar))
 grDevices::dev.off()
 
-unlink(c(sigprofiler_file, png_file, pdf_file, svg_file, device_file))
+# Animation path and argument validation do not require a GIF encoder.
+camera <- legoplots:::orbit_camera_path(8L, 45, 35, 15, 7)
+stopifnot(
+  identical(dim(camera), c(8L, 2L)),
+  max(camera$azimuth) <= 60,
+  min(camera$azimuth) >= 30,
+  max(camera$elevation) <= 42,
+  min(camera$elevation) >= 28
+)
+
+# World-z lines and bar edges remain parallel at every animation angle.
+for (i in seq_len(nrow(camera))) {
+  vertical <- legoplots:::iso_project(
+    x = c(4, 4), y = c(6, 6), z = c(0, 3),
+    elevation = camera$elevation[i], azimuth = camera$azimuth[i]
+  )
+  stopifnot(
+    abs(diff(vertical$sx)) < sqrt(.Machine$double.eps),
+    abs(diff(vertical$sy) - 3 * cos(camera$elevation[i] * pi / 180)) <
+      sqrt(.Machine$double.eps)
+  )
+}
+
+expect_error(
+  animate_legoplot3d(values, outfile = tempfile(fileext = ".png")),
+  "gif extension"
+)
+
+gif_file <- tempfile(fileext = ".gif")
+if (requireNamespace("gifski", quietly = TRUE)) {
+  animate_legoplot3d(
+    values,
+    outfile = gif_file,
+    n_frames = 3L,
+    fps = 3,
+    width = 300,
+    height = 240,
+    res = 72,
+    progress = FALSE
+  )
+  stopifnot(
+    file.exists(gif_file),
+    file.info(gif_file)$size > 0,
+    rawToChar(readBin(gif_file, "raw", n = 6L)) %in% c("GIF87a", "GIF89a")
+  )
+}
+
+unlink(c(sigprofiler_file, png_file, pdf_file, svg_file, device_file, gif_file))

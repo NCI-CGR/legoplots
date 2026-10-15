@@ -73,7 +73,7 @@ The \code{layout} data frame, invisibly.
 Draw a static projected 3D plot using base graphics.
 }
 \examples{
-layout <- compute_lego_layout(setNames(runif(96), context96$context), sixcolors = "mike")
+layout <- compute_lego_layout(setNames(runif(96), context96$context))
 render_lego3d(layout, labels = TRUE, zsub = "Probability")
 \dontrun{
 render_lego3d(layout, outfile = "sig.png")   # works with no display at all

@@ -6,7 +6,7 @@
 \usage{
 legoplot3d(
   contextdata,
-  sixcolors = "mike",
+  colors = "sanger",
   sample = NULL,
   gap = 0.2,
   zscale = 3,
@@ -30,7 +30,7 @@ legoplot3d(
 \item{contextdata}{Numeric mutation-context values; a SigProfiler matrix or
 data frame; or a path to a tab-delimited SigProfiler SBS96 matrix.}
 
-\item{sixcolors}{Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
+\item{colors}{Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
 or a custom vector of 6 colors (see \code{\link{lego_palette}}).}
 
 \item{sample}{Sample or signature column name or number when \code{contextdata}
@@ -74,7 +74,7 @@ Draw an SBS96 spectrum as a static projected 3D bar plot.
 }
 \examples{
 x <- setNames(seq_len(96), context96$context)
-legoplot3d(x, sixcolors = "mike", labels = TRUE, zsub = "Count")
+legoplot3d(x, labels = TRUE, zsub = "Count")
 \dontrun{
 # Plot a sample directly from a SigProfiler SBS96 matrix.
 legoplot3d("project.SBS96.all", sample = "Sample1", outfile = "sample1.pdf")
