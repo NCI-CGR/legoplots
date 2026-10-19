@@ -14,6 +14,8 @@ render_lego3d(
   zsub = FALSE,
   gridlines = TRUE,
   main = NULL,
+  main_line = NULL,
+  mar = NULL,
   legend = FALSE,
   alpha = 1,
   elevation = 35.26439,
@@ -46,6 +48,13 @@ render_lego3d(
 \item{gridlines}{Draw a floor grid under the bars.}
 
 \item{main}{Optional plot title.}
+
+\item{main_line}{Optional margin line for the title. Lower values move the
+title toward the plotting region; negative values move it inside the
+plotting region. \code{NULL} uses the base-R default.}
+
+\item{mar}{Plot margins in lines, as \code{c(bottom, left, top, right)}. Defaults
+to \code{c(1, 1, 3, 1)} when \code{main} is supplied and \code{c(1, 1, 1, 1)} otherwise.}
 
 \item{legend}{Draw a boxed base-substitution color legend.}
 

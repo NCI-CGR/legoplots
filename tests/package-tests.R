@@ -61,6 +61,10 @@ utils::write.table(sigprofiler, sigprofiler_file, sep = "\t", row.names = FALSE,
                    quote = FALSE)
 stopifnot(identical(read_sigprofiler_sbs96(sigprofiler_file), sigprofiler_matrix))
 expect_error(legoplot3d(sigprofiler_matrix), "multiple columns")
+expect_error(
+  legoplot3d(sigprofiler_matrix, sample = c("Sample1", "missing")),
+  "missing"
+)
 
 # Separate mutation/trinucleotide fields used by some MatrixGenerator outputs.
 split_format <- data.frame(
@@ -94,12 +98,55 @@ svg_file <- tempfile(fileext = ".svg")
 result <- legoplot3d(values, outfile = png_file, width = 500, height = 400)
 legoplot3d(sigprofiler_matrix, sample = "Sample1", outfile = pdf_file,
            width = 500, height = 400)
+multi_pdf_file <- tempfile(fileext = ".pdf")
+multi_result <- legoplot3d(
+  sigprofiler_matrix,
+  sample = c("Sample2", "Sample1"),
+  outfile = multi_pdf_file,
+  width = 500,
+  height = 400,
+  ncol = 1
+)
+free_z_pdf_file <- tempfile(fileext = ".pdf")
+legoplot3d(
+  sigprofiler_matrix,
+  sample = c("Sample1", "Sample2"),
+  free_z = TRUE,
+  outfile = free_z_pdf_file,
+  width = 500,
+  height = 400
+)
 stopifnot(
   file.exists(png_file), file.info(png_file)$size > 0,
   file.exists(pdf_file), file.info(pdf_file)$size > 0,
+  file.exists(multi_pdf_file), file.info(multi_pdf_file)$size > 0,
+  file.exists(free_z_pdf_file), file.info(free_z_pdf_file)$size > 0,
   rawToChar(readBin(pdf_file, "raw", n = 4L)) == "%PDF",
-  nrow(result) == 96L
+  rawToChar(readBin(multi_pdf_file, "raw", n = 4L)) == "%PDF",
+  nrow(result) == 96L,
+  is.list(multi_result),
+  identical(names(multi_result), c("Sample2", "Sample1")),
+  identical(multi_result$Sample2$value, as.numeric(seq_len(96) * 2)),
+  identical(multi_result$Sample1$value, as.numeric(seq_len(96)))
 )
+stopifnot(
+  identical(legoplots:::resolve_panel_grid(5L), c(nrow = 1L, ncol = 5L)),
+  identical(legoplots:::resolve_panel_grid(5L, ncol = 2L),
+            c(nrow = 3, ncol = 2L)),
+  identical(legoplots:::resolve_panel_grid(5L, nrow = 2L),
+            c(nrow = 2L, ncol = 3))
+)
+expect_error(
+  legoplot3d(sigprofiler_matrix, sample = c("Sample1", "Sample2"),
+             nrow = 1, ncol = 1),
+  "enough panels"
+)
+expect_error(
+  legoplot3d(sigprofiler_matrix, sample = c("Sample1", "Sample2"),
+             free_z = TRUE, zmax = 100),
+  "cannot be supplied"
+)
+expect_error(legoplot3d(values, free_z = NA), "TRUE or FALSE")
 svg_available <- tryCatch({
   suppressWarnings(legoplot3d(values, outfile = svg_file, width = 500, height = 400))
   file.exists(svg_file)
@@ -113,8 +160,25 @@ expect_error(legoplot3d(values, outfile = tempfile(fileext = ".jpg")), "extensio
 device_file <- tempfile(fileext = ".pdf")
 grDevices::pdf(device_file)
 old_mar <- graphics::par("mar")
-legoplot3d(values)
+legoplot3d(values, main = "Compact title", main_line = -1,
+           mar = c(1, 1, 3, 1))
 stopifnot(identical(graphics::par("mar"), old_mar))
+grDevices::dev.off()
+expect_error(legoplot3d(values, mar = c(1, 1, 1)), "four non-negative")
+expect_error(legoplot3d(values, main_line = Inf), "one finite")
+
+# Consecutive calls advance through a base-R multi-panel layout.
+mfrow_file <- tempfile(fileext = ".pdf")
+grDevices::pdf(mfrow_file)
+graphics::par(mfrow = c(1, 2))
+legoplot3d(values)
+first_panel <- graphics::par("mfg")
+legoplot3d(values * 2)
+second_panel <- graphics::par("mfg")
+stopifnot(
+  identical(first_panel, c(1L, 1L, 1L, 2L)),
+  identical(second_panel, c(1L, 2L, 1L, 2L))
+)
 grDevices::dev.off()
 
 # Animation path and argument validation do not require a GIF encoder.
@@ -164,4 +228,5 @@ if (requireNamespace("gifski", quietly = TRUE)) {
   )
 }
 
-unlink(c(sigprofiler_file, png_file, pdf_file, svg_file, device_file, gif_file))
+unlink(c(sigprofiler_file, png_file, pdf_file, multi_pdf_file, free_z_pdf_file,
+         svg_file, device_file, mfrow_file, gif_file))

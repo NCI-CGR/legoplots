@@ -178,7 +178,7 @@ order_sigprofiler_matrix <- function(x) {
   result
 }
 
-select_sigprofiler_sample <- function(x, sample = NULL) {
+sigprofiler_sample_indices <- function(x, sample = NULL, multiple = FALSE) {
   if (is.null(sample)) {
     if (ncol(x) != 1L) {
       stop(
@@ -190,17 +190,36 @@ select_sigprofiler_sample <- function(x, sample = NULL) {
     sample <- 1L
   }
 
-  if (is.character(sample) && length(sample) == 1L && !is.na(sample)) {
-    sample <- match(sample, colnames(x))
-    if (is.na(sample)) {
-      stop("Unknown sample or signature name.", call. = FALSE)
+  valid_length <- length(sample) >= 1L && (multiple || length(sample) == 1L)
+  if (is.character(sample) && valid_length && !anyNA(sample)) {
+    indices <- match(sample, colnames(x))
+    if (anyNA(indices)) {
+      unknown <- unique(sample[is.na(indices)])
+      stop("Unknown sample or signature name(s): ",
+           paste(unknown, collapse = ", "), ".", call. = FALSE)
     }
-  } else if (is.numeric(sample) && length(sample) == 1L && is.finite(sample) &&
-             sample == as.integer(sample) && sample >= 1L && sample <= ncol(x)) {
-    sample <- as.integer(sample)
+  } else if (is.numeric(sample) && valid_length && all(is.finite(sample)) &&
+             all(sample == as.integer(sample)) && all(sample >= 1L) &&
+             all(sample <= ncol(x))) {
+    indices <- as.integer(sample)
   } else {
-    stop("sample must be one column name or column number.", call. = FALSE)
+    qualifier <- if (multiple) "one or more" else "one"
+    stop("sample must be ", qualifier, " column name or column number.",
+         call. = FALSE)
   }
+  if (anyDuplicated(indices)) {
+    stop("sample must not select the same column more than once.", call. = FALSE)
+  }
+  indices
+}
+
+select_sigprofiler_sample <- function(x, sample = NULL) {
+  sample <- sigprofiler_sample_indices(x, sample = sample)
 
   stats::setNames(as.numeric(x[, sample]), rownames(x))
+}
+
+select_sigprofiler_samples <- function(x, sample = NULL) {
+  sample <- sigprofiler_sample_indices(x, sample = sample, multiple = TRUE)
+  x[, sample, drop = FALSE]
 }
