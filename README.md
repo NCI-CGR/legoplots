@@ -66,6 +66,8 @@ locally or in a minimal container.
   in one call, with the combined parameter set above. Selecting multiple
   samples plots them side by side with a shared vertical scale; set
   `free_z = TRUE` to scale each panel independently.
+- `legoplot3d_sbs288(contextdata, ...)` — splits one SBS288 sample into its
+  U, T, and N strand channels and plots the three SBS96 panels side by side.
 - `animate_legoplot3d(contextdata, ...)` — renders a gently moving camera path
   as an animated GIF.
 - `read_sigprofiler_sbs96(x)` — imports SigProfiler SBS96 files, matrices, or
@@ -132,6 +134,25 @@ The importer accepts `MutationType` and `Mutation Types` context columns,
 contexts stored as row names, transposed matrices with contexts as columns,
 and files containing separate substitution and trinucleotide columns.
 Strand-prefixed contexts are collapsed to SBS96 by summing strands.
+
+## SBS288 strand plots
+
+Use `legoplot3d_sbs288()` to compare the untranscribed, transcribed, and
+non-transcribed channels of one SBS288 sample:
+
+```r
+legoplot3d_sbs288(
+  "output/SBS/project.SBS288.all",
+  sample = "Sample1",
+  labels = TRUE,
+  zsub = "Mutation count",
+  outfile = "Sample1_SBS288.png"
+)
+```
+
+Rows may use strand-prefixed labels such as `U:A[C>A]A`, or separate U/T/N
+and SBS96 context columns. The panels use a shared vertical scale by default;
+pass `free_z = TRUE` for independent scales.
 
 ## Input format
 

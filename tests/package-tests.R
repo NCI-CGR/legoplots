@@ -167,6 +167,59 @@ grDevices::dev.off()
 expect_error(legoplot3d(values, mar = c(1, 1, 1)), "four non-negative")
 expect_error(legoplot3d(values, main_line = Inf), "one finite")
 
+# SBS288 input is split into U, T, and N panels in that order.
+sbs288_labels <- unlist(lapply(
+  c("U", "T", "N"),
+  function(strand) paste0(strand, ":", context96$context)
+), use.names = FALSE)
+sbs288 <- data.frame(
+  MutationType = sbs288_labels,
+  Sample1 = seq_len(288),
+  Sample2 = seq_len(288) * 2,
+  check.names = FALSE
+)
+sbs288_file <- tempfile(fileext = ".txt")
+utils::write.table(sbs288, sbs288_file, sep = "\t", row.names = FALSE,
+                   quote = FALSE)
+sbs288_png <- tempfile(fileext = ".png")
+sbs288_result <- legoplot3d_sbs288(
+  sbs288_file,
+  sample = "Sample1",
+  outfile = sbs288_png,
+  width = 400,
+  height = 320
+)
+stopifnot(
+  identical(names(sbs288_result), c("U", "T", "N")),
+  identical(sbs288_result$U$value, as.numeric(seq_len(96))),
+  identical(sbs288_result$T$value, as.numeric(97:192)),
+  identical(sbs288_result$N$value, as.numeric(193:288)),
+  file.exists(sbs288_png),
+  file.info(sbs288_png)$size > 0
+)
+
+# Separate strand and context fields produce the same ordered matrix.
+sbs288_split <- data.frame(
+  Strand = rep(c("U", "T", "N"), each = 96),
+  MutationType = rep(context96$context, 3),
+  Sample1 = seq_len(288),
+  check.names = FALSE
+)
+stopifnot(identical(
+  legoplots:::read_sigprofiler_sbs288(sbs288_split),
+  legoplots:::read_sigprofiler_sbs288(sbs288[, c("MutationType", "Sample1")])
+))
+sbs288_matrix <- legoplots:::read_sigprofiler_sbs288(
+  sbs288[, c("MutationType", "Sample1", "Sample2")]
+)
+stopifnot(identical(
+  legoplots:::read_sigprofiler_sbs288(
+    as.data.frame(t(sbs288_matrix), check.names = FALSE)
+  ),
+  sbs288_matrix
+))
+expect_error(legoplot3d_sbs288(sbs288), "multiple columns")
+
 # Consecutive calls advance through a base-R multi-panel layout.
 mfrow_file <- tempfile(fileext = ".pdf")
 grDevices::pdf(mfrow_file)
@@ -229,4 +282,4 @@ if (requireNamespace("gifski", quietly = TRUE)) {
 }
 
 unlink(c(sigprofiler_file, png_file, pdf_file, multi_pdf_file, free_z_pdf_file,
-         svg_file, device_file, mfrow_file, gif_file))
+         svg_file, device_file, mfrow_file, gif_file, sbs288_file, sbs288_png))
