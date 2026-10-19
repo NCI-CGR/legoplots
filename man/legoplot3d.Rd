@@ -23,7 +23,12 @@ legoplot3d(
   outfile = NA,
   width = 1000,
   height = 800,
-  res = 150
+  res = 150,
+  nrow = NULL,
+  ncol = NULL,
+  free_z = FALSE,
+  mar = NULL,
+  main_line = NULL
 )
 }
 \arguments{
@@ -33,14 +38,16 @@ data frame; or a path to a tab-delimited SigProfiler SBS96 matrix.}
 \item{colors}{Palette: \code{"broad"}, \code{"sanger"}, \code{"mike"},
 or a custom vector of 6 colors (see \code{\link{lego_palette}}).}
 
-\item{sample}{Sample or signature column name or number when \code{contextdata}
-is a SigProfiler matrix. May be omitted for a one-column matrix.}
+\item{sample}{One or more sample or signature column names or numbers when
+\code{contextdata} is a SigProfiler matrix. Multiple selections are plotted
+side by side. May be omitted for a one-column matrix.}
 
 \item{gap}{Fraction (0-1) of each grid cell left empty as a gap between bars.}
 
 \item{zscale}{Height, in grid units, that the tallest bar should reach.}
 
-\item{zmax}{Data value mapped to \code{zscale}; defaults to the maximum value.}
+\item{zmax}{Data value mapped to \code{zscale}; defaults to the maximum value
+across selected samples unless \code{free_z = TRUE}.}
 
 \item{labels}{Draw "preceding base"/"succeeding base" axis labels.}
 
@@ -50,7 +57,8 @@ is a SigProfiler matrix. May be omitted for a one-column matrix.}
 
 \item{gridlines}{Draw a floor grid under the bars.}
 
-\item{main}{Optional plot title.}
+\item{main}{Optional plot title. For multiple samples, either one title to
+reuse or one title per sample. Sample names are used when this is \code{NULL}.}
 
 \item{legend}{Draw a boxed base-substitution color legend.}
 
@@ -62,12 +70,30 @@ is a SigProfiler matrix. May be omitted for a one-column matrix.}
 
 \item{outfile}{Output path, or \code{NA} for the current graphics device.}
 
-\item{width, height}{Output size in pixels (PNG) or inches (PDF/SVG, via \code{width/res}).}
+\item{width, height}{Output size per panel in pixels (PNG) or inches
+(PDF/SVG, via \code{width/res}). Multi-sample output is \code{width} times the
+number of panel columns and \code{height} times the number of panel rows.}
 
 \item{res}{Resolution in dpi, used for PNG output.}
+
+\item{nrow, ncol}{Optional numbers of panel rows and columns for multiple
+samples. If only one is supplied, the other is calculated automatically.
+By default, all samples are placed in one row.}
+
+\item{free_z}{Use a separate vertical scale for each panel. The default,
+\code{FALSE}, uses a shared scale so bar heights can be compared across panels.
+Cannot be combined with an explicit \code{zmax}.}
+
+\item{mar}{Plot margins in lines, as \code{c(bottom, left, top, right)}. Defaults
+to \code{c(1, 1, 3, 1)} for titled plots and \code{c(1, 1, 1, 1)} otherwise.}
+
+\item{main_line}{Optional margin line for panel titles. Lower values move
+titles toward the plotting region; negative values move them inside it.
+\code{NULL} uses the base-R default.}
 }
 \value{
-The computed layout data frame, invisibly.
+For one sample, the computed layout data frame. For multiple
+samples, a named list of layout data frames. Returned invisibly.
 }
 \description{
 Draw an SBS96 spectrum as a static projected 3D bar plot.
@@ -78,5 +104,11 @@ legoplot3d(x, labels = TRUE, zsub = "Count")
 \dontrun{
 # Plot a sample directly from a SigProfiler SBS96 matrix.
 legoplot3d("project.SBS96.all", sample = "Sample1", outfile = "sample1.pdf")
+# Plot selected samples side by side.
+legoplot3d("project.SBS96.all", sample = c("Sample1", "Sample2"))
+# Stack the same samples vertically.
+legoplot3d("project.SBS96.all", sample = c("Sample1", "Sample2"), ncol = 1)
+# Give each sample its own vertical scale.
+legoplot3d("project.SBS96.all", sample = c("Sample1", "Sample2"), free_z = TRUE)
 }
 }

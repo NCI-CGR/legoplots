@@ -87,6 +87,11 @@ draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, alpha = 1,
 #' @param zsub Descriptive label for the vertical axis, or \code{FALSE} for none.
 #' @param gridlines Draw a floor grid under the bars.
 #' @param main Optional plot title.
+#' @param main_line Optional margin line for the title. Lower values move the
+#'   title toward the plotting region; negative values move it inside the
+#'   plotting region. `NULL` uses the base-R default.
+#' @param mar Plot margins in lines, as `c(bottom, left, top, right)`. Defaults
+#'   to `c(1, 1, 3, 1)` when `main` is supplied and `c(1, 1, 1, 1)` otherwise.
 #' @param legend Draw a boxed base-substitution color legend.
 #' @param alpha Bar opacity between 0 (fully transparent) and 1 (opaque).
 #' @param elevation Camera elevation in degrees, greater than 0 and less than 90.
@@ -107,7 +112,9 @@ draw_iso_bar <- function(x0, x1, y0, y1, z1, topcolor, alpha = 1,
 #' @export
 render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
                            labels = FALSE, zlabels = TRUE, zsub = FALSE,
-                           gridlines = TRUE, main = NULL, legend = FALSE, alpha = 1,
+                           gridlines = TRUE, main = NULL, main_line = NULL,
+                           mar = NULL,
+                           legend = FALSE, alpha = 1,
                            elevation = 35.26439, azimuth = 45,
                            shade_top = 1, shade_front = 0.8, shade_right = 0.6,
                            border = "grey15",
@@ -175,6 +182,17 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
         (is.character(main) && length(main) == 1L && !is.na(main)))) {
     stop("main must be NULL or a single character string.", call. = FALSE)
   }
+  if (!is.null(main_line) &&
+      (!is.numeric(main_line) || length(main_line) != 1L ||
+       !is.finite(main_line))) {
+    stop("main_line must be NULL or one finite number.", call. = FALSE)
+  }
+  if (is.null(mar)) {
+    mar <- c(1, 1, if (is.null(main)) 1 else 3, 1)
+  } else if (!is.numeric(mar) || length(mar) != 4L || any(!is.finite(mar)) ||
+             any(mar < 0)) {
+    stop("mar must be NULL or four non-negative numbers.", call. = FALSE)
+  }
   if (!is.numeric(elevation) || length(elevation) != 1L || !is.finite(elevation) ||
       elevation <= 0 || elevation >= 90) {
     stop("elevation must be a single number greater than 0 and less than 90 degrees.",
@@ -234,8 +252,8 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
     }
     on.exit(grDevices::dev.off(), add = TRUE)
   } else {
-    old_par <- graphics::par(no.readonly = TRUE)
-    on.exit(graphics::par(old_par), add = TRUE)
+    old_mar <- graphics::par("mar")
+    on.exit(graphics::par(mar = old_mar), add = TRUE)
   }
 
   # Set up a canvas large enough for the projected grid and bars.
@@ -244,11 +262,17 @@ render_lego3d <- function(layout, gap = 0.2, zscale = 3, zmax = NULL,
   p <- iso_project(corners$x, corners$y, corners$z,
                    elevation = elevation, azimuth = azimuth)
   pad <- 0.08 * max(diff(range(p$sx)), diff(range(p$sy)))
-  graphics::par(mar = c(1, 1, if (is.null(main)) 1 else 3, 1))
+  graphics::par(mar = mar)
   graphics::plot(NA, xlim = range(p$sx) + c(-pad, pad) * 2.2,
                  ylim = range(p$sy) + c(-pad, pad * 1.3),
                  asp = 1, axes = FALSE, xlab = "", ylab = "")
-  if (!is.null(main)) graphics::title(main = main)
+  if (!is.null(main)) {
+    if (is.null(main_line)) {
+      graphics::title(main = main)
+    } else {
+      graphics::title(main = main, line = main_line)
+    }
+  }
 
   # Draw the floor grid.
   if (gridlines) {

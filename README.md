@@ -63,7 +63,9 @@ locally or in a minimal container.
   `labels`, `zlabels`, `zsub`, `gridlines`, `main`, face-shading factors,
   and `outfile`/`width`/`height`/`res`.
 - `legoplot3d(contextdata, ...)` — the convenience wrapper: layout + render
-  in one call, with the combined parameter set above.
+  in one call, with the combined parameter set above. Selecting multiple
+  samples plots them side by side with a shared vertical scale; set
+  `free_z = TRUE` to scale each panel independently.
 - `animate_legoplot3d(contextdata, ...)` — renders a gently moving camera path
   as an animated GIF.
 - `read_sigprofiler_sbs96(x)` — imports SigProfiler SBS96 files, matrices, or
@@ -119,6 +121,11 @@ You can also import once and reuse the resulting matrix:
 ```r
 sbs96 <- read_sigprofiler_sbs96("output/SBS/project.SBS96.all")
 legoplot3d(sbs96, sample = "Sample1")
+legoplot3d(sbs96, sample = c("Sample1", "Sample2"))
+legoplot3d(sbs96, sample = c("Sample1", "Sample2"), ncol = 1)
+legoplot3d(sbs96, sample = c("Sample1", "Sample2"), free_z = TRUE)
+legoplot3d(sbs96, sample = c("Sample1", "Sample2"),
+           mar = c(1, 1, 3, 1), main_line = -1)
 ```
 
 The importer accepts `MutationType` and `Mutation Types` context columns,
