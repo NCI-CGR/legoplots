@@ -12,6 +12,10 @@ Install the package from a local checkout:
 ```r
 install.packages(".", repos = NULL, type = "source")
 ```
+Alternatively
+```r
+devtools::install_github("NCI-CGR/legoplots")
+```
 
 For development, `devtools::load_all()` also works if devtools is installed.
 
